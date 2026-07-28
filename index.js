@@ -1,16 +1,9 @@
-const { Client, GatewayIntentBits, ActivityType } = require('discord.js');
+const { Client, GatewayIntentBits, REST, Routes, SlashCommandBuilder } = require('discord.js');
 const express = require('express');
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
-app.get('/', (req, res) => {
-  res.status(200).send({ status: 'OK', uptime: process.uptime() });
-});
-
-app.listen(PORT, () => {
-  console.log(`HTTP server listening on port ${PORT}`);
-});
+app.get('/', (req, res) => res.send('Bot activo 24/7'));
+app.listen(process.env.PORT || 3000, () => console.log('Servidor listo'));
 
 const client = new Client({
   intents: [
@@ -20,29 +13,37 @@ const client = new Client({
   ]
 });
 
-client.once('ready', () => {
-  console.log(`Logged in as ${client.user.tag}`);
-  
-  client.user.setPresence({
-    activities: [{ name: 'System Active', type: ActivityType.Custom }],
-    status: 'online'
-  });
-});
+const commands = [
+  new SlashCommandBuilder().setName('ping').setDescription('Responde con Pong!'),
+  new SlashCommandBuilder().setName('hola').setDescription('Saluda al bot')
+].map(command => command.toJSON());
 
-client.on('messageCreate', async (message) => {
-  if (message.author.bot) return;
+client.once('ready', async () => {
+  console.log(`Conectado como ${client.user.tag}`);
 
-  if (message.content === '!ping') {
-    await message.reply('Pong.');
+  const rest = new REST({ version: '10' }).setToken(process.env.TOKEN);
+  try {
+    console.log('Registrando Slash Commands...');
+    await rest.put(
+      Routes.applicationCommands(client.user.id),
+      { body: commands }
+    );
+    console.log('¡Comandos registrados con éxito!');
+  } catch (error) {
+    console.error('Error al registrar comandos:', error);
   }
 });
 
-process.on('unhandledRejection', (reason) => {
-  console.error('Unhandled Rejection:', reason);
-});
+client.on('interactionCreate', async interaction => {
+  if (!interaction.isChatInputCommand()) return;
 
-process.on('uncaughtException', (error) => {
-  console.error('Uncaught Exception:', error);
+  const { commandName } = interaction;
+
+  if (commandName === 'ping') {
+    await interaction.reply('🏓 ¡Pong!');
+  } else if (commandName === 'hola') {
+    await interaction.reply(`¡Hola, ${interaction.user.username}! 👋`);
+  }
 });
 
 client.login(process.env.TOKEN);
